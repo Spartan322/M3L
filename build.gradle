@@ -1,0 +1,60 @@
+plugins {
+	id 'java'
+	id 'idea'
+	id 'eclipse'
+}
+
+apply from: 'gradle/project.gradle'
+
+//Project data
+String dirNatives = "natives/${minecraftVersion}"
+
+repositories {
+	mavenCentral()
+	jcenter()
+	maven {
+		name 'Minecraft Library Repository'
+		url 'https://libraries.minecraft.net'
+	}
+	maven {
+		name 'Minecraft Forge Repository'
+		url 'http://files.minecraftforge.net/maven'
+	}
+}
+
+//M3L information
+version = "${minecraftVersion}-0.3b"
+group = 'cuchaz.m3l'
+dependencies {
+	compile 'net.minecraft:launchwrapper:1.8'
+	compile 'com.google.guava:guava:18.0'
+	compile 'org.javassist:javassist:3.19.0-GA'
+	compile 'ch.qos.logback:logback-classic:1.1.2'
+	compile 'org.slf4j:slf4j-api:1.7.10'
+	compile "net.minecraftforge:forge:${forgeVersion}:universal"
+	compile fileTree(dir: dirLib, include: 'forge*.jar')
+	compile fileTree(dir: dirLib, include: '*deobf.jar')
+	compile fileTree(dir: dirNatives, include: '*.jar')
+
+	testCompile 'junit:junit:4.12'
+	testCompile 'org.hamcrest:hamcrest-all:1.3'
+}
+
+sourceSets {
+	main {
+		java {
+			srcDir 'src'
+		}
+		resources {
+			srcDir 'resources'
+		}
+	}
+	test {
+		java {
+			srcDir 'test'
+		}
+		resources {
+			srcDir 'test'
+		}
+	}
+}

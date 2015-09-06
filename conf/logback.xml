@@ -1,0 +1,15 @@
+<configuration>
+
+	<!-- turn off debug spam from other libraries -->
+	<logger name="io.netty" level="INFO"/>
+
+	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender"> 
+		<encoder>
+			<pattern>%d{HH:mm:ss.SSS} %-5level %-12t %c{100}: %msg%n</pattern>
+		</encoder>
+	</appender>
+
+	<root level="DEBUG">
+		<appender-ref ref="STDOUT"/>
+	</root>
+</configuration>

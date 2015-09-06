@@ -1,0 +1,30 @@
+syntax: glob
+#Ignore everything
+/*
+
+#Except:
+# Project sources
+!/src
+
+# Configuration files & mappings
+!/conf
+
+# Artwork
+!/art
+
+# GitHub Files
+!/.gitignore
+!/*.md
+
+# Scripts
+!/*.py
+
+# Project information
+!/LICENSE*
+!/README*
+
+# Gradle & properties files
+!/*.gradle
+!/*.properties
+!/gradlew*
+!/gradle

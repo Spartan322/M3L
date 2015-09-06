@@ -1,0 +1,209 @@
+import groovy.json.JsonSlurper
+
+import java.nio.file.Files
+
+//Project data
+String dirNatives = "natives/${minecraftVersion}"
+
+//Minecraft data
+String minecraftRepo = 'https://s3.amazonaws.com/Minecraft.Download/',
+       versionURL = "${minecraftRepo}versions/${minecraftVersion}/"
+
+//Mapping data
+String mappingsCommit = '88962d643ca3912333ede2da1b25d9a1092d5781',
+       mappingsFile = "../Enigma Mappings/${minecraftVersion}.mappings",
+       pathMappings = "conf/${minecraftVersion}.client.mappings"
+
+//Client files
+String pathCleanJar = "${dirLib}/minecraft-${minecraftVersion}-clean.jar",
+       pathTempJar = "${dirLib}/minecraft-${minecraftVersion}-temp.jar",
+       pathDeobfJar = "${dirLib}/minecraft-${minecraftVersion}-client-deobf.jar",
+       pathSrcJar = "${dirLib}/minecraft-${minecraftVersion}-client-deobf-src.jar"
+
+configurations {
+	procyon
+	enigma
+	enigma.extendsFrom procyon
+	compile.extendsFrom enigma
+}
+
+repositories {
+	mavenCentral()
+	jcenter()
+	maven {
+		name 'Cuchaz Custom Repository'
+		url 'http://maven.cuchazinteractive.com'
+	}
+}
+
+dependencies {
+	procyon 'org.bitbucket.mstrobel:procyon-core:0.5.29',
+			'org.bitbucket.mstrobel:procyon-reflection:0.5.29',
+			'org.bitbucket.mstrobel:procyon-compilertools:0.5.29',
+			'org.bitbucket.mstrobel:procyon-expressions:0.5.29'
+	enigma module("cuchaz:enigma-lib:${enigmaVersion}") {
+		dependency('com.google.guava:guava:18.0')
+		dependency('org.javassist:javassist:3.19.0-GA')
+	}
+}
+
+task downloadNatives() << {
+	println "Downloading libraries from ${versionURL}${minecraftVersion}.json..."
+	download("${project.tasks.downloadNatives.temporaryDir}/version.json", "${versionURL}${minecraftVersion}.json")
+
+	def jsonSlurper = new JsonSlurper()
+	def root = jsonSlurper.parse(new File("${project.tasks.downloadNatives.temporaryDir}/version.json"))
+	assert root instanceof Map
+	assert root.libraries instanceof List
+	root.libraries.each {
+		assert it.name instanceof String
+		assert it.rules instanceof List || it.rules == null
+		assert it.natives instanceof Map || it.natives == null
+
+		String location = it.name
+		String natives = parseNatives it
+
+		if (parseRules(it)) {
+			String packagePath = location.split(':')[0]
+			String name = location.split(':')[1]
+			String version = location.split(':')[2]
+			String arch = System.getProperty('os.arch')
+
+			String downloadURL = "https://libraries.minecraft.net/${packagePath.replace('.', '/')}/${name}/${version}/${name}-${version}"
+			if (natives == '?') {
+				download("${dirNatives}/${name}-${version}.jar", "${downloadURL}.jar")
+			} else {
+				if (!download("${dirNatives}/${name}-${version}-${natives}-${arch}.jar", "${downloadURL}-${natives}-${arch}.jar")) {
+					download("${dirNatives}/${name}-${version}-${natives}.jar", "${downloadURL}-${natives}.jar")
+				}
+			}
+		}
+	}
+}
+downloadNatives {
+	group = 'M3L'
+	description = 'Downloads needed natives for specified Minecraft version'
+	outputs.upToDateWhen {false}
+}
+
+task getMappings << {
+	if (mappingsFile != null && new File(mappingsFile).isFile()) {
+		Files.copy(new File(mappingsFile).toPath(), new File(pathMappings).newOutputStream())
+		println "Read mappings from ${mappingsFile}."
+	} else {
+		download(pathMappings, "https://bitbucket.org/cuchaz/minecraft-mappings/raw/${mappingsCommit}/${minecraftVersion}.mappings")
+		println "Wrote mappings to ${pathMappings}"
+	}
+}
+getMappings {
+	group = 'M3L'
+	description = 'Uses or downloads mapping for specified version'
+	outputs.upToDateWhen {false}
+}
+
+task deobfMinecraftClient(dependsOn: getMappings, type: Jar) << {
+	download(pathCleanJar, "${versionURL}${minecraftVersion}.jar")
+	println "Deobfuscating ${pathTempJar}..."
+	javaexec {
+		classpath = configurations.enigma
+		main = 'cuchaz.enigma.CommandMain'
+		args = ['deobfuscate', pathCleanJar, pathTempJar, pathMappings]
+	}
+	println "Wrote ${pathTempJar}."
+	println "Publifying ${pathTempJar}..."
+	javaexec {
+		classpath = configurations.enigma
+		main = 'cuchaz.enigma.CommandMain'
+		args = ['publify', pathTempJar, pathDeobfJar]
+	}
+	println "Wrote ${pathDeobfJar}."
+	println "Decompiling ${pathDeobfJar}..."
+	File tmp = tasks.deobfMinecraftClient.temporaryDir
+	tmp.mkdir()
+	String tmpPath = tmp.getPath()
+	javaexec {
+		classpath = configurations.enigma
+		main = 'cuchaz.enigma.CommandMain'
+		args = ['decompile', pathTempJar, tmpPath]
+	}
+	//TODO: Fix jar not generating bug.
+	jar {
+		from tasks.deobfMinecraftClient.temporaryDir
+		destinationDir = new File(dirLib)
+		archiveName = "minecraft-${minecraftVersion}-client-deobf-src.jar"
+	}
+	println "Wrote ${pathSrcJar}."
+}
+deobfMinecraftClient {
+	group = 'M3L'
+	description = 'Downloads, deobfuscates Minecraft client sources and generates corresponding and source jars'
+	outputs.upToDateWhen {false}
+}
+
+task setupDevEnv << {
+	tasks.downloadNatives.execute()
+	tasks.deobfMinecraftClient.execute()
+}
+setupDevEnv{
+	group = 'M3L'
+	description = 'Sets up development environment'
+	outputs.upToDateWhen {false}
+}
+
+// Helper methods
+static parseRules(lib) {
+	if (lib.rules) {
+		def download = false
+		lib.rules.each {rule ->
+			if (rule.os) {
+				if (rule.os.name == getOs()) {
+					download = rule.action == 'allow'
+				}
+			} else {
+				download = rule.action == 'allow'
+			}
+		}
+		download
+	} else {
+		true
+	}
+}
+
+static parseNatives(lib) {
+	if (lib.natives && getOs() != 'unknown') {
+		assert lib.natives instanceof Map
+		lib.natives.get(getOs())
+	} else {
+		'?'
+	}
+}
+
+static String getOs() {
+	switch (System.getProperty('os.name').toLowerCase()) {
+		case ~/.*(linux|unix|bsd).*/:
+			return 'linux'
+		case ~/.*win.*/:
+			return 'windows'
+		case ~/.*(osx|mac).*/:
+			return 'osx'
+		default:
+			return 'unknown'
+	}
+}
+
+static boolean download(String filePath, String dependencyURL) {
+	try {
+		File file = new File(filePath)
+		file.getParentFile().mkdirs();
+		if (!file.exists()) {
+			println "Downloading ${dependencyURL}..."
+			new URL(dependencyURL).withInputStream {i -> file.withOutputStream {it << i}}
+		}
+		return true
+	}
+	catch (Exception ignored) {
+		println 'Download failed!'
+	}finally{
+		return false
+	}
+}
