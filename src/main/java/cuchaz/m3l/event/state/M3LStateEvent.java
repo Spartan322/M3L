@@ -6,4 +6,25 @@
  * http://www.gnu.org/licenses/lgpl.html
  ******************************************************************************/
 
-rootProject.name = 'm3l'
+package cuchaz.m3l.event.state;
+
+import cuchaz.m3l.api.Environment;
+import cuchaz.m3l.api.State;
+import cuchaz.m3l.event.handler.M3LEvent;
+import cuchaz.m3l.lib.Side;
+
+/**
+ * @author Caellian
+ */
+public abstract class M3LStateEvent extends M3LEvent {
+
+    public M3LStateEvent(Object... data) {
+
+    }
+
+    public abstract State getState();
+
+    public Side getSide() {
+        return Environment.getSide();
+    }
+}

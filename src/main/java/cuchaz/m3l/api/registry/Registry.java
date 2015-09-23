@@ -5,5 +5,11 @@
  * License v3.0 which accompanies this distribution, and is available at
  * http://www.gnu.org/licenses/lgpl.html
  ******************************************************************************/
+package cuchaz.m3l.api.registry;
 
-rootProject.name = 'm3l'
+import cuchaz.m3l.api.chunks.ChunkSystem;
+
+
+public class Registry {
+    public SingleRegistry<ChunkSystem> chunkSystem = new SingleRegistry<ChunkSystem>();
+}

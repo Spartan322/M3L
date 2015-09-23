@@ -6,4 +6,11 @@
  * http://www.gnu.org/licenses/lgpl.html
  ******************************************************************************/
 
-rootProject.name = 'm3l'
+package cuchaz.m3l.event.handler;
+
+/**
+ * @author Caellian
+ */
+public interface IEventListener {
+    void elicit(M3LEvent event);
+}

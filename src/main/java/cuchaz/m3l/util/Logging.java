@@ -5,5 +5,19 @@
  * License v3.0 which accompanies this distribution, and is available at
  * http://www.gnu.org/licenses/lgpl.html
  ******************************************************************************/
+package cuchaz.m3l.util;
 
-rootProject.name = 'm3l'
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+public class Logging {
+
+    public static Logger getLogger() {
+        return getLogger(Thread.currentThread().getStackTrace()[2].getClassName());
+    }
+
+    public static Logger getLogger(String name) {
+        return LoggerFactory.getLogger(name);
+    }
+}

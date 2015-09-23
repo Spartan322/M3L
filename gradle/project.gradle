@@ -1,3 +1,11 @@
+/*******************************************************************************
+ * Copyright (c) 2015 Contributors.
+ * All rights reserved. This program and the accompanying materials are made available under
+ * the terms of the GNU Lesser General Public
+ * License v3.0 which accompanies this distribution, and is available at
+ * http://www.gnu.org/licenses/lgpl.html
+ ******************************************************************************/
+
 import groovy.json.JsonSlurper
 
 import java.nio.file.Files
@@ -10,15 +18,23 @@ String minecraftRepo = 'https://s3.amazonaws.com/Minecraft.Download/',
        versionURL = "${minecraftRepo}versions/${minecraftVersion}/"
 
 //Mapping data
-String mappingsCommit = '88962d643ca3912333ede2da1b25d9a1092d5781',
-       mappingsFile = "../Enigma Mappings/${minecraftVersion}.mappings",
-       pathMappings = "conf/${minecraftVersion}.client.mappings"
+String mappingsCommit = 'ad8e6e4e9f3302649d94861be1651015f244f9e3',
+	   clientMappingsFile = "../Enigma Mappings/${minecraftVersion}-client.mappings",
+	   serverMappingsFile = "../Enigma Mappings/${minecraftVersion}-server.mappings",
+	   pathMappingsClient = "conf/${minecraftVersion}.client.mappings",
+	   pathMappingsServer = "conf/${minecraftVersion}.server.mappings"
 
 //Client files
-String pathCleanJar = "${dirLib}/minecraft-${minecraftVersion}-clean.jar",
-       pathTempJar = "${dirLib}/minecraft-${minecraftVersion}-temp.jar",
-       pathDeobfJar = "${dirLib}/minecraft-${minecraftVersion}-client-deobf.jar",
-       pathSrcJar = "${dirLib}/minecraft-${minecraftVersion}-client-deobf-src.jar"
+String pathClientCleanJar = "${dirLib}/minecraft-${minecraftVersion}-client-clean.jar",
+	   pathClientTempJar = "${dirLib}/minecraft-${minecraftVersion}-client-temp.jar",
+	   pathClientDeobfJar = "${dirLib}/minecraft-${minecraftVersion}-client-deobf.jar",
+	   pathClientSrcJar = "${dirLib}/minecraft-${minecraftVersion}-client-deobf-src.jar"
+
+//Server files
+String pathServerCleanJar = "${dirLib}/minecraft-${minecraftVersion}-server-clean.jar",
+	   pathServerTempJar = "${dirLib}/minecraft-${minecraftVersion}-server-temp.jar",
+	   pathServerDeobfJar = "${dirLib}/minecraft-${minecraftVersion}-server-deobf.jar",
+	   pathServerSrcJar = "${dirLib}/minecraft-${minecraftVersion}-server-deobf-src.jar"
 
 configurations {
 	procyon
@@ -81,72 +97,127 @@ task downloadNatives() << {
 	}
 }
 downloadNatives {
-	group = 'M3L'
+	group = 'Minecraft'
 	description = 'Downloads needed natives for specified Minecraft version'
 	outputs.upToDateWhen {false}
 }
 
-task getMappings << {
-	if (mappingsFile != null && new File(mappingsFile).isFile()) {
-		Files.copy(new File(mappingsFile).toPath(), new File(pathMappings).newOutputStream())
-		println "Read mappings from ${mappingsFile}."
+task getClientMappings << {
+	if (clientMappingsFile != null && new File(clientMappingsFile).isFile()) {
+		Files.copy(new File(clientMappingsFile).toPath(), new File(pathMappings).newOutputStream())
+		println "Read client mappings from ${clientMappingsFile}."
 	} else {
-		download(pathMappings, "https://bitbucket.org/cuchaz/minecraft-mappings/raw/${mappingsCommit}/${minecraftVersion}.mappings")
-		println "Wrote mappings to ${pathMappings}"
+		download(pathMappingsClient, "https://bitbucket.org/cuchaz/minecraft-mappings/raw/${mappingsCommit}/${minecraftVersion}-client.mappings")
+		println "Wrote client mappings to ${pathMappings}"
 	}
 }
-getMappings {
+getClientMappings {
 	group = 'M3L'
-	description = 'Uses or downloads mapping for specified version'
+	description = 'Finds or downloads client mappings for specified version'
 	outputs.upToDateWhen {false}
 }
 
-task deobfMinecraftClient(dependsOn: getMappings, type: Jar) << {
-	download(pathCleanJar, "${versionURL}${minecraftVersion}.jar")
-	println "Deobfuscating ${pathTempJar}..."
+task getServerMappings << {
+	if (serverMappingsFile != null && new File(serverMappingsFile).isFile()) {
+		Files.copy(new File(serverMappingsFile).toPath(), new File(pathMappings).newOutputStream())
+		println "Read server mappings from ${serverMappingsFile}."
+	} else {
+		download(pathMappingsServer, "https://bitbucket.org/cuchaz/minecraft-mappings/raw/${mappingsCommit}/${minecraftVersion}-server.mappings")
+		println "Wrote server mappings to ${pathMappings}"
+	}
+}
+getServerMappings {
+	group = 'M3L'
+	description = 'Finds or downloads server mappings for specified version'
+	outputs.upToDateWhen { false }
+}
+
+task deobfMinecraftClient(dependsOn: getClientMappings, type: Jar) << {
+	download(pathClientCleanJar, "${versionURL}${minecraftVersion}.jar")
+	println "Deobfuscating ${pathClientTempJar}..."
 	javaexec {
 		classpath = configurations.enigma
 		main = 'cuchaz.enigma.CommandMain'
-		args = ['deobfuscate', pathCleanJar, pathTempJar, pathMappings]
+		args = ['deobfuscate', pathClientCleanJar, pathClientTempJar, pathMappingsClient]
 	}
-	println "Wrote ${pathTempJar}."
-	println "Publifying ${pathTempJar}..."
+	println "Wrote ${pathClientTempJar}."
+	println "Publifying ${pathClientTempJar}..."
 	javaexec {
 		classpath = configurations.enigma
 		main = 'cuchaz.enigma.CommandMain'
-		args = ['publify', pathTempJar, pathDeobfJar]
+		args = ['publify', pathClientTempJar, pathClientDeobfJar]
 	}
-	println "Wrote ${pathDeobfJar}."
-	println "Decompiling ${pathDeobfJar}..."
+	println "Wrote ${pathClientDeobfJar}."
+	println "Decompiling ${pathClientDeobfJar}..."
 	File tmp = tasks.deobfMinecraftClient.temporaryDir
 	tmp.mkdir()
 	String tmpPath = tmp.getPath()
 	javaexec {
 		classpath = configurations.enigma
 		main = 'cuchaz.enigma.CommandMain'
-		args = ['decompile', pathTempJar, tmpPath]
+		args = ['decompile', pathClientTempJar, tmpPath]
 	}
-	//TODO: Fix jar not generating bug.
+	//TODO: Fix jar not generating bug?
 	jar {
 		from tasks.deobfMinecraftClient.temporaryDir
-		destinationDir = new File(dirLib)
-		archiveName = "minecraft-${minecraftVersion}-client-deobf-src.jar"
+		destinationDir = '.'
+		archiveName = pathClientSrcJar
 	}
-	println "Wrote ${pathSrcJar}."
+	println "Wrote ${pathClientSrcJar}."
 }
 deobfMinecraftClient {
-	group = 'M3L'
+	group = 'Minecraft'
 	description = 'Downloads, deobfuscates Minecraft client sources and generates corresponding and source jars'
 	outputs.upToDateWhen {false}
+}
+
+task deobfMinecraftServer(dependsOn: getServerMappings, type: Jar) << {
+	download(pathServerCleanJar, "${versionURL}minecraft_server.${minecraftVersion}.jar")
+	println "Deobfuscating ${pathServerTempJar}..."
+	javaexec {
+		classpath = configurations.enigma
+		main = 'cuchaz.enigma.CommandMain'
+		args = ['deobfuscate', pathServerCleanJar, pathServerTempJar, pathMappingsServer]
+	}
+	println "Wrote ${pathServerTempJar}."
+	println "Publifying ${pathServerTempJar}..."
+	javaexec {
+		classpath = configurations.enigma
+		main = 'cuchaz.enigma.CommandMain'
+		args = ['publify', pathServerTempJar, pathServerDeobfJar]
+	}
+	println "Wrote ${pathServerDeobfJar}."
+	println "Decompiling ${pathServerDeobfJar}..."
+	File tmp = tasks.deobfMinecraftServer.temporaryDir
+	tmp.mkdir()
+	String tmpPath = tmp.getPath()
+	javaexec {
+		classpath = configurations.enigma
+		main = 'cuchaz.enigma.CommandMain'
+		args = ['decompile', pathServerTempJar, tmpPath]
+	}
+	//TODO: Fix jar not generating bug?
+	jar {
+		from tasks.deobfMinecraftServer.temporaryDir
+		destinationDir = '.'
+		archiveName = pathServerSrcJar
+	}
+	println "Wrote ${pathServerSrcJar}."
+}
+deobfMinecraftServer {
+	group = 'Minecraft'
+	description = 'Downloads, deobfuscates Minecraft server sources and generates corresponding and source jars'
+	outputs.upToDateWhen { false }
 }
 
 task setupDevEnv << {
 	tasks.downloadNatives.execute()
 	tasks.deobfMinecraftClient.execute()
+	tasks.deobfMinecraftServer.execute()
 }
 setupDevEnv{
 	group = 'M3L'
-	description = 'Sets up development environment'
+	description = 'Sets up complete development environment'
 	outputs.upToDateWhen {false}
 }
 

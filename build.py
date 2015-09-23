@@ -7,17 +7,21 @@ from urllib.request import *
 # settings
 PathSsjb = "../ssjb"
 MinecraftVersion = "1.8.3"
-M3LVersion = "%s-0.3b" % MinecraftVersion
+M3LVersion = "%s-0.4b" % MinecraftVersion
 DirNatives = os.path.join("natives", MinecraftVersion)
 DirLib = "lib"
 DirBin = "bin"
 DirBuild = "build"
-MappingsCommit = "88962d643ca3912333ede2da1b25d9a1092d5781"
-MappingsFile = None #"../Enigma Mappings/1.8.3.mappings"
-PathMappings = "conf/%s.client.mappings" % MinecraftVersion
+PathMappingsClient = "conf/%s.client.mappings" % MinecraftVersion
+PathMappingsServer = "conf/%s.server.mappings" % MinecraftVersion
 PathLocalMavenRepo = "../maven"
 PathForgeUniversal = os.path.join(DirLib, "forge-1.8-11.14.1.1334-universal.jar")
 ForgeVersion = "1334"
+
+# possible sources taskGetMappings() uses to download/copy mappings
+MappingsCommit = "ad8e6e4e9f3302649d94861be1651015f244f9e3"
+PathMappingsClientReadFrom = None #"../Enigma Mappings/1.8.3.client.mappings"
+PathMappingsServerReadFrom = None #"../Enigma Mappings/1.8.3.server.mappings"
 
 MinecraftRepo = "https://s3.amazonaws.com/Minecraft.Download/"
 VersionURL = "%sversions/%s/" % (MinecraftRepo, MinecraftVersion)
@@ -38,14 +42,14 @@ ExtraRepos = [
 	"https://libraries.minecraft.net",
 ]
 Deps = [
-	ssjb.ivy.Dep("cuchaz:enigma-lib:0.10.4b"), #, localPath="../Enigma/build/enigma-lib-0.10.4b.jar"), # TEMP
+	ssjb.ivy.Dep("cuchaz:enigma-lib:0.11b"), #, localPath="../Enigma/build/enigma-lib-0.10.4b.jar"), # TEMP
 	ssjb.ivy.Dep("net.minecraft:launchwrapper:1.8"),
 	ssjb.ivy.Dep("org.apache.commons:commons-lang3:3.1"),
 	ssjb.ivy.Dep("org.slf4j:slf4j-api:1.7.10"),
 	ssjb.ivy.Dep("ch.qos.logback:logback-classic:1.1.2"),
 	ssjb.ivy.Dep("org.javassist:javassist:3.19.0-GA")
 ]
-EnigmaStandaloneDep = ssjb.ivy.Dep("cuchaz:enigma:0.10.4b") #, localPath="../Enigma/build/enigma-0.10.4b.jar") # TEMP
+EnigmaStandaloneDep = ssjb.ivy.Dep("cuchaz:enigma:0.11b") #, localPath="../Enigma/build/enigma-0.10.4b.jar") # TEMP
 TestDeps = [
 	ssjb.ivy.Dep("junit:junit:4.12"),
 	ssjb.ivy.Dep("org.hamcrest:hamcrest-all:1.3")
@@ -178,9 +182,9 @@ def makeMinecraftDepsJar(pathOut, dirNatives):
 
 		ssjb.jar.makeJar(pathOut, dirTemp)
 
-def deobfuscateJar(pathIn, pathOut):
+def deobfuscateJar(pathIn, pathOut, pathMappings):
 	print ("Deobfuscating %s ..." % pathIn)
-	callEnigma("deobfuscate", [pathIn, pathOut, PathMappings])
+	callEnigma("deobfuscate", [pathIn, pathOut, pathMappings])
 	print ("Wrote %s" % pathOut)
 	
 def decompileJar(pathIn, pathOut):
@@ -196,6 +200,7 @@ def publifyJar(pathIn, pathOut):
 	print ("Wrote %s" % pathOut)
 
 # TODO: find a better way to represent the whitelist?
+# SOLUTION: Maybe scan trough code and collect imports in a list?
 ForgeApiWhitelistFiles = set([
 	"MinecraftForge-License.txt",
 	"MinecraftForge-Credits.txt",
@@ -212,19 +217,12 @@ ForgeApiWhitelistClasses = set([
 	"net.minecraftforge.fml.common.ModContainer",
 	"net.minecraftforge.fml.common.ModContainer$Disableable",
 	"net.minecraftforge.fml.common.ModMetadata",
-	"net.minecraftforge.fml.common.event.FMLEvent",
 	"net.minecraftforge.fml.common.event.FMLStateEvent",
-	"net.minecraftforge.fml.common.event.FMLConstructionEvent",
-	"net.minecraftforge.fml.common.event.FMLInitializationEvent",
-	"net.minecraftforge.fml.common.event.FMLLoadCompleteEvent",
-	"net.minecraftforge.fml.common.event.FMLPostInitializationEvent",
-	"net.minecraftforge.fml.common.event.FMLPreInitializationEvent",
 	"net.minecraftforge.fml.common.eventhandler.IEventListener",
 	"net.minecraftforge.fml.common.eventhandler.ListenerList",
 	"net.minecraftforge.fml.common.eventhandler.SubscribeEvent",
 	"net.minecraftforge.fml.common.eventhandler.Event",
 	"net.minecraftforge.fml.common.eventhandler.ASMEventHandler",
-	"net.minecraftforge.fml.common.eventhandler.EventPriority",
 	"net.minecraftforge.fml.common.versioning.ArtifactVersion",
 	"net.minecraftforge.fml.common.versioning.VersionRange"
 ])
@@ -245,6 +243,13 @@ def makeForgeApiJar(pathOut):
 		ssjb.jar.unpackJar(dirTemp, PathForgeUniversal, forgeApiWhitelist)
 		ssjb.jar.makeJar(pathOut, dirTemp)
 
+def copyMappings(side, pathOut, commit, pathLocalFile):
+	if pathLocalFile is not None and os.path.isfile(pathLocalFile):
+		ssjb.file.cp(pathLocalFile, pathOut)
+		print "Read %s mappings from %s" % (side, pathLocalFile)
+	else:
+		downloadWithProgress("https://bitbucket.org/cuchaz/minecraft-mappings/raw/%s/%s-%s.mappings" % (commit, MinecraftVersion, side), pathOut)
+	print "Wrote %s mappings to %s" % (side, pathOut)
 
 # tasks
 
@@ -261,18 +266,30 @@ def taskGetMappings():
 		print ("Read mappings from %s" % MappingsFile)
 	else:
 		downloadWithProgress("https://bitbucket.org/cuchaz/minecraft-mappings/raw/%s/%s.mappings" % (MappingsCommit, MinecraftVersion), PathMappings)
+	copyMappings("client", PathMappingsClient, MappingsCommit, PathMappingsClientReadFrom)
+	copyMappings("server", PathMappingsServer, MappingsCommit, PathMappingsServerReadFrom)
 
 def taskDeobfMinecraftClient():
 	ssjb.file.mkdir(DirLib)
 	ssjb.file.delete(DirNatives)
 	ssjb.file.mkdir(DirNatives)
 	makeMinecraftDepsJar(os.path.join(DirLib, "minecraft-%s-deps.jar" % MinecraftVersion), DirNatives)
-	pathTempJar = os.path.join(DirLib, "minecraft-%s-temp.jar" % MinecraftVersion)
+	pathTempJar = os.path.join(DirLib, "minecraft-%s-client-temp.jar" % MinecraftVersion)
 	pathDeobfJar = os.path.join(DirLib, "minecraft-%s-client-deobf.jar" % MinecraftVersion)
 	pathSrcJar = os.path.join(DirLib, "minecraft-%s-client-deobf-src.jar" % MinecraftVersion)
-	deobfuscateJar(getMinecraftClientJar(MinecraftVersion), pathTempJar)
+	deobfuscateJar(getMinecraftClientJar(MinecraftVersion), pathTempJar, PathMappingsClient)
 	publifyJar(pathTempJar, pathDeobfJar)
 	decompileJar(pathDeobfJar, pathSrcJar)
+
+def taskDeobfMinecraftServer():
+	ssjb.file.mkdir(DirLib)
+	pathTempJar = os.path.join(DirLib, "minecraft-%s-server-temp.jar" % MinecraftVersion)
+	pathDeobfJar = os.path.join(DirLib, "minecraft-%s-server-deobf.jar" % MinecraftVersion)
+	pathSrcJar = os.path.join(DirLib, "minecraft-%s-server-deobf-src.jar" % MinecraftVersion)
+	deobfuscateJar(getMinecraftServerJar(MinecraftVersion), pathTempJar, PathMappingsServer)
+	publifyJar(pathTempJar, pathDeobfJar)
+	decompileJar(pathDeobfJar, pathSrcJar)
+	ssjb.file.delete(pathTempJar)
 
 def taskBuild():
 	ssjb.file.delete(DirBuild)
@@ -297,6 +314,7 @@ def taskInfo():
 ssjb.registerTask("getDeps", taskGetDeps)
 ssjb.registerTask("getMappings", taskGetMappings)
 ssjb.registerTask("deobfMinecraftClient", taskDeobfMinecraftClient)
+ssjb.registerTask("deobfMinecraftServer", taskDeobfMinecraftServer)
 ssjb.registerTask("build", taskBuild)
 ssjb.registerTask("main", taskInfo)
 ssjb.registerTask("help", taskInfo)

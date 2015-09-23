@@ -5,5 +5,15 @@
  * License v3.0 which accompanies this distribution, and is available at
  * http://www.gnu.org/licenses/lgpl.html
  ******************************************************************************/
+package cuchaz.m3l.classTransformation;
 
-rootProject.name = 'm3l'
+import cuchaz.m3l.lib.Side;
+import javassist.CannotCompileException;
+import javassist.CtClass;
+import javassist.NotFoundException;
+
+public interface ClassTransformer {
+    boolean meetsRequirements(CtClass c);
+
+    void compile(HookCompiler precopmiler, CtClass c, Side side) throws NotFoundException, CannotCompileException;
+}

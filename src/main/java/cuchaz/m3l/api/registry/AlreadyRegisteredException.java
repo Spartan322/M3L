@@ -5,5 +5,11 @@
  * License v3.0 which accompanies this distribution, and is available at
  * http://www.gnu.org/licenses/lgpl.html
  ******************************************************************************/
+package cuchaz.m3l.api.registry;
 
-rootProject.name = 'm3l'
+
+public class AlreadyRegisteredException extends Exception {
+
+    private static final long serialVersionUID = -7142551567501458868L;
+
+}

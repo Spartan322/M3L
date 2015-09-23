@@ -5,5 +5,8 @@
  * License v3.0 which accompanies this distribution, and is available at
  * http://www.gnu.org/licenses/lgpl.html
  ******************************************************************************/
+package cuchaz.m3l.classTransformation;
 
-rootProject.name = 'm3l'
+public class HookWriter {
+
+}

@@ -5,5 +5,14 @@
  * License v3.0 which accompanies this distribution, and is available at
  * http://www.gnu.org/licenses/lgpl.html
  ******************************************************************************/
+package cuchaz.m3l.tweaker;
 
-rootProject.name = 'm3l'
+import cuchaz.m3l.lib.Side;
+
+
+public class TweakerClassTransformerClientDev extends TweakerClassTransformer {
+
+    public TweakerClassTransformerClientDev() {
+        super(Side.Client, false);
+    }
+}

@@ -5,5 +5,9 @@
  * License v3.0 which accompanies this distribution, and is available at
  * http://www.gnu.org/licenses/lgpl.html
  ******************************************************************************/
+package cuchaz.m3l.discovery;
 
-rootProject.name = 'm3l'
+
+public interface ModDiscoverer {
+    Iterable<ModDiscovery> findMods();
+}

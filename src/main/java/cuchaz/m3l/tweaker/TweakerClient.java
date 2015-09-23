@@ -5,5 +5,13 @@
  * License v3.0 which accompanies this distribution, and is available at
  * http://www.gnu.org/licenses/lgpl.html
  ******************************************************************************/
+package cuchaz.m3l.tweaker;
 
-rootProject.name = 'm3l'
+import cuchaz.m3l.lib.Side;
+
+public class TweakerClient extends Tweaker {
+
+    public TweakerClient() {
+        super("net.minecraft.client.main.Main", TweakerClassTransformerClient.class.getName(), Side.Client);
+    }
+}
